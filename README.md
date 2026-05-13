@@ -51,3 +51,9 @@ An advanced, feature‑packed Tic‑Tac‑Toe game built with Python and Streaml
    ```bash
    git clone https://github.com/Artidevi29/Tic-Tac-Toe-.git
    cd Tic-Tac-Toe-
+
+
+## Run locally
+```bash
+pip install streamlit
+streamlit run app.py
