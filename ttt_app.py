@@ -2,8 +2,6 @@ import streamlit as st
 import json
 import os
 from datetime import datetime
-import streamlit.components.v1 as components
-import hashlib
 
 # ---------- Unbeatable AI (Minimax) ----------
 def minimax(board, depth, is_maximizing, bot_symbol, player_symbol):
@@ -92,7 +90,7 @@ def load_history():
             return json.load(f)
     return []
 
-# ---------- Session State Management ----------
+# ---------- Session State ----------
 def init_match():
     if st.session_state.mode == "Two Player":
         st.session_state.scores = {
@@ -183,6 +181,51 @@ def finish_match():
 # ---------- Page Config ----------
 st.set_page_config(page_title="Ultimate Tic Tac Toe", page_icon="🏆", layout="wide")
 
+# ---------- Force 3 columns on mobile (CSS) ----------
+st.markdown("""
+<style>
+    /* Force the horizontal block to stay in a single row */
+    .stHorizontalBlock {
+        flex-wrap: nowrap !important;
+    }
+    /* Make each column flexible and prevent shrinking */
+    .stHorizontalBlock > div {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+    }
+    /* Buttons scale nicely */
+    .stButton button {
+        font-size: clamp(24px, 8vw, 48px) !important;
+        height: clamp(60px, 20vw, 100px) !important;
+        width: 100% !important;
+        white-space: nowrap;
+    }
+    /* Rotate warning */
+    .rotate-warning {
+        display: none;
+        background-color: #ffcc00;
+        color: #000;
+        text-align: center;
+        padding: 12px;
+        border-radius: 10px;
+        margin: 10px 0;
+        font-weight: bold;
+        font-size: 1.2rem;
+        animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+        0% { opacity: 0.7; }
+        50% { opacity: 1; }
+        100% { opacity: 0.7; }
+    }
+    @media (orientation: portrait) {
+        .rotate-warning {
+            display: block;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ---------- Sidebar Settings ----------
 st.sidebar.header("⚙️ Game Settings")
 mode = st.sidebar.radio("Mode", ["Two Player", "vs Bot"])
@@ -193,7 +236,6 @@ if mode == "Two Player":
 else:
     p1_name = st.sidebar.text_input("Your Name (X)", "You")
 
-# Reset session when mode or names change
 needs_reset = False
 if "mode" not in st.session_state:
     st.session_state.mode = mode
@@ -255,7 +297,6 @@ if st.session_state.match_active:
         init_match()
         st.rerun()
 else:
-    # Match finished view
     st.header("🏆 Match Finished 🏆")
     if mode == "Two Player":
         p1_wins = st.session_state.scores.get(st.session_state.p1_name, 0)
@@ -280,40 +321,10 @@ else:
         st.rerun()
     st.stop()
 
-# ---------- Main Title & Rotation Warning ----------
+# ---------- Main Title and Rotate Warning ----------
 st.title("🏆 Ultimate Tic‑Tac‑Toe")
-st.caption("Unbeatable Bot • Match History • Fully Mobile")
-
-# Rotation warning (appears only in portrait mode)
-st.markdown("""
-<style>
-    .rotate-warning {
-        display: none;
-        background-color: #ffcc00;
-        color: #000;
-        text-align: center;
-        padding: 12px;
-        border-radius: 10px;
-        margin: 10px 0;
-        font-weight: bold;
-        font-size: 1.2rem;
-        animation: pulse 1s infinite;
-    }
-    @keyframes pulse {
-        0% { opacity: 0.7; }
-        50% { opacity: 1; }
-        100% { opacity: 0.7; }
-    }
-    @media (orientation: portrait) {
-        .rotate-warning {
-            display: block;
-        }
-    }
-</style>
-<div class="rotate-warning">
-    📱🔄 Rotate your phone to LANDSCAPE mode for the best Tic‑Tac‑Toe experience!
-</div>
-""", unsafe_allow_html=True)
+st.caption("Unbeatable Bot • Match History • Mobile Friendly")
+st.markdown('<div class="rotate-warning">📱🔄 Rotate your phone to LANDSCAPE mode for the best experience!</div>', unsafe_allow_html=True)
 
 # ---------- Round End Handling ----------
 if st.session_state.get("round_over", False):
@@ -352,92 +363,57 @@ if not st.session_state.get("round_over", False):
         else:
             st.markdown("### 🤖 Bot is thinking...")
 
-# ---------- HTML/CSS Grid Board (Guaranteed 3 Columns) ----------
-# Use a unique token to avoid caching issues
-token = hashlib.md5(str(st.session_state).encode()).hexdigest()[:8]
-
+# ---------- Draw the Board with st.columns (now forced horizontal) ----------
 board = st.session_state.board
-disabled = st.session_state.get("round_over", False)
-bot_turn = (mode == "vs Bot" and st.session_state.current_player == "O" and not disabled)
 
-html_board = f"""
-<div id="ttt-board" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 400px; margin: 0 auto; padding: 10px;">
-"""
+# Create 3 columns
+cols = st.columns(3)
 for i in range(3):
     for j in range(3):
         cell = board[i][j]
         if cell == "X":
-            display = "❌"
+            label = "❌"
         elif cell == "O":
-            display = "⭕"
+            label = "⭕"
         else:
-            display = "⬜"
-        is_disabled = (cell != " ") or disabled or bot_turn
-        disabled_attr = "disabled" if is_disabled else ""
-        html_board += f"""
-        <button style="font-size: clamp(30px, 10vw, 60px); height: clamp(70px, 20vw, 100px); background-color: #1e1e2f; color: white; border-radius: 15px; border: none; cursor: pointer;" 
-                {disabled_attr}
-                onclick="sendMove({i},{j})">
-            {display}
-        </button>
-        """
-html_board += """
-</div>
-<script>
-    function sendMove(row, col) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('move_row', row);
-        url.searchParams.set('move_col', col);
-        url.searchParams.set('_token', 'TOKEN');
-        window.location.href = url.toString();
-    }
-</script>
-"""
-html_board = html_board.replace("TOKEN", token)
-
-components.html(html_board, height=450)
-
-# ---------- Process Move from Query Parameters ----------
-query_params = st.query_params
-if 'move_row' in query_params and 'move_col' in query_params:
-    try:
-        row = int(query_params['move_row'])
-        col = int(query_params['move_col'])
-        st.query_params.clear()
-        if not st.session_state.get("round_over", False) and st.session_state.board[row][col] == " ":
-            if mode == "Two Player":
-                st.session_state.board[row][col] = st.session_state.current_player
-                winner_sym = check_winner(st.session_state.board)
-                if winner_sym:
-                    end_round(winner_symbol=winner_sym, tie=False)
-                elif is_full(st.session_state.board):
-                    end_round(tie=True)
-                else:
-                    st.session_state.current_player = "O" if st.session_state.current_player == "X" else "X"
-                st.rerun()
-            else:  # vs Bot
-                if st.session_state.current_player == "X":
-                    st.session_state.board[row][col] = "X"
-                    winner_sym = check_winner(st.session_state.board)
+            label = "⬜"
+        disabled = (cell != " ") or st.session_state.get("round_over", False)
+        # Disable if vs bot and it's bot's turn
+        if mode == "vs Bot" and not st.session_state.get("round_over", False) and st.session_state.current_player == "O":
+            disabled = True
+        if cols[j].button(label, key=f"{i}_{j}", use_container_width=True, disabled=disabled):
+            # Handle human move
+            if not st.session_state.get("round_over", False) and board[i][j] == " ":
+                if mode == "Two Player":
+                    board[i][j] = st.session_state.current_player
+                    winner_sym = check_winner(board)
                     if winner_sym:
-                        end_round(winner_symbol="X", tie=False)
-                    elif is_full(st.session_state.board):
+                        end_round(winner_symbol=winner_sym, tie=False)
+                    elif is_full(board):
                         end_round(tie=True)
                     else:
-                        st.session_state.current_player = "O"
-                        st.rerun()
-    except:
-        pass
+                        st.session_state.current_player = "O" if st.session_state.current_player == "X" else "X"
+                    st.rerun()
+                else:  # vs Bot
+                    if st.session_state.current_player == "X":
+                        board[i][j] = "X"
+                        winner_sym = check_winner(board)
+                        if winner_sym:
+                            end_round(winner_symbol="X", tie=False)
+                        elif is_full(board):
+                            end_round(tie=True)
+                        else:
+                            st.session_state.current_player = "O"
+                            st.rerun()
 
-# ---------- Bot Move ----------
+# ---------- Bot Move (only if vs Bot and bot's turn) ----------
 if mode == "vs Bot" and not st.session_state.get("round_over", False) and st.session_state.current_player == "O":
-    bot_best_move(st.session_state.board, "O", "X")
-    winner_sym = check_winner(st.session_state.board)
+    bot_best_move(board, "O", "X")
+    winner_sym = check_winner(board)
     if winner_sym:
         end_round(winner_symbol="O", tie=False)
-    elif is_full(st.session_state.board):
+    elif is_full(board):
         end_round(tie=True)
     else:
         st.session_state.current_player = "X"
     st.rerun()
-    
